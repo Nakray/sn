@@ -58,6 +58,55 @@ func (col *Collector) CollectUser(userID int64) error {
 		}
 	}
 
+	// Get wall posts
+	posts, err := col.client.GetWallPosts(userID, 100)
+	if err != nil {
+		log.Printf("Failed to get wall posts for user %d: %v\n", userID, err)
+	} else {
+		var postIDs []int64
+		for _, post := range posts {
+			if id, ok := post["id"].(float64); ok {
+				postIDs = append(postIDs, int64(id))
+				// Save post object
+				postOwner := database.Owner{Type: database.OwnerTypeUser, ID: userID}
+				postDetails := map[string]interface{}{"id": int64(id)}
+				col.db.WriteObject("vkontakte", postOwner, "post", postDetails, post)
+			}
+		}
+		if len(postIDs) > 0 {
+			col.db.WriteRelations("vkontakte", owner, database.RelationTypePost, nil, postIDs)
+		}
+	}
+
+	// Get followers
+	followers, err := col.client.GetFollowers(userID, 1000)
+	if err != nil {
+		log.Printf("Failed to get followers for user %d: %v\n", userID, err)
+	} else {
+		if err := col.db.WriteRelations("vkontakte", owner, database.RelationTypeFollower, nil, followers); err != nil {
+			log.Printf("Failed to save followers: %v\n", err)
+		}
+	}
+
+	// Get photos
+	photos, err := col.client.GetPhotos(userID, "profile", 100)
+	if err != nil {
+		log.Printf("Failed to get photos for user %d: %v\n", userID, err)
+	} else {
+		var photoIDs []int64
+		for _, photo := range photos {
+			if id, ok := photo["id"].(float64); ok {
+				photoIDs = append(photoIDs, int64(id))
+				photoOwner := database.Owner{Type: database.OwnerTypeUser, ID: userID}
+				photoDetails := map[string]interface{}{"id": int64(id)}
+				col.db.WriteObject("vkontakte", photoOwner, "photo", photoDetails, photo)
+			}
+		}
+		if len(photoIDs) > 0 {
+			col.db.WriteRelations("vkontakte", owner, database.RelationTypePhoto, nil, photoIDs)
+		}
+	}
+
 	return nil
 }
 
