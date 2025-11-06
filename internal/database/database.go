@@ -3,9 +3,8 @@ package database
 import (
 	"database/sql"
 	"encoding/json"
+	"github.com/lib/pq"
 	"time"
-
-	_ "github.com/lib/pq"
 )
 
 type DB struct {
@@ -27,18 +26,22 @@ type Owner struct {
 type RelationType string
 
 const (
-	RelationTypeFriend        RelationType = "friend"
-	RelationTypeFollower      RelationType = "follower"
-	RelationTypeGroup         RelationType = "group"
-	RelationTypePost          RelationType = "post"
-	RelationTypePhoto         RelationType = "photo"
-	RelationTypePostLike      RelationType = "post.like"
-	RelationTypePhotoLike     RelationType = "photo.like"
-	RelationTypePostComment   RelationType = "post.comment"
-	RelationTypePhotoComment  RelationType = "photo.comment"
+	RelationTypeFriend       RelationType = "friend"
+	RelationTypeFollower     RelationType = "follower"
+	RelationTypeGroup        RelationType = "group"
+	RelationTypePost         RelationType = "post"
+	RelationTypePhoto        RelationType = "photo"
+	RelationTypePostLike     RelationType = "post.like"
+	RelationTypePhotoLike    RelationType = "photo.like"
+	RelationTypePostComment  RelationType = "post.comment"
+	RelationTypePhotoComment RelationType = "photo.comment"
 )
 
 func New(connStr string) (*DB, error) {
+	negative := time.Date(1, 1, 1, 0, 0, 0, 0, time.UTC)
+	positive := time.Date(9999, 12, 31, 23, 59, 59, 999999999, time.UTC)
+	pq.EnableInfinityTs(negative, positive)
+
 	conn, err := sql.Open("postgres", connStr)
 	if err != nil {
 		return nil, err

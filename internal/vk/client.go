@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -33,13 +32,13 @@ type APIError struct {
 	ErrorMsg  string `json:"error_msg"`
 }
 
-func NewClient(accessToken string, proxyURL string) (*Client, error) {
+func NewClient(accessToken string, proxyURL *string) (*Client, error) {
 	client := &http.Client{
 		Timeout: 30 * time.Second,
 	}
 
-	if proxyURL != "" {
-		proxy, err := url.Parse(proxyURL)
+	if proxyURL != nil {
+		proxy, err := url.Parse(*proxyURL)
 		if err != nil {
 			return nil, err
 		}

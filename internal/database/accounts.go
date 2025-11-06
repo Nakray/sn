@@ -12,9 +12,9 @@ type Account struct {
 	Login             string
 	Password          string
 	Session           map[string]interface{}
-	Proxy             string
+	Proxy             *string
 	IsBlocked         bool
-	Info              string
+	Info              *string
 	UnavailableUntil  *time.Time
 	GroupID           int
 }

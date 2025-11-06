@@ -1,4 +1,5 @@
 package server
+
 const indexHTML = `<!DOCTYPE html>
 <html>
 <head>
@@ -37,8 +38,8 @@ const indexHTML = `<!DOCTYPE html>
     <div class="container">
         <h1>SN - VK Data Collector</h1>
         <div class="tabs">
-            <button class="tab active" onclick="showTab('tasks')">Monitoring Tasks</button>
-            <button class="tab" onclick="showTab('accounts')">Accounts</button>
+            <button class="tab active" onclick="showTab('tasks', this)">Monitoring Tasks</button>
+            <button class="tab" onclick="showTab('accounts', this)">Accounts</button>
         </div>
         <!-- Tasks Tab -->
         <div class="tab-content active" id="tasks">
@@ -117,10 +118,10 @@ const indexHTML = `<!DOCTYPE html>
         </div>
     </div>
     <script>
-        function showTab(tabName) {
+        function showTab(tabName, btn) {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-            event.target.classList.add('active');
+            btn.classList.add('active');
             document.getElementById(tabName).classList.add('active');
         }
 
@@ -128,16 +129,16 @@ const indexHTML = `<!DOCTYPE html>
             const res = await fetch('/api/tasks');
             const tasks = await res.json();
             const tbody = document.querySelector('#tasksTable tbody');
-            tbody.innerHTML = tasks.map(t => `
-                <tr>
-                    <td>${t.ID}</td>
-                    <td>${t.OwnerType}</td>
-                    <td>${t.OwnerID}</td>
-                    <td>${t.Period}</td>
-                    <td>${new Date(t.LastTimestamp).toLocaleString()}</td>
-                    <td><button class="btn-small danger" onclick="deleteTask(${t.ID})">Delete</button></td>
-                </tr>
-            `).join('');
+            tbody.innerHTML = tasks.map(function(t){
+                return "<tr>" +
+                    "<td>" + t.ID + "</td>" +
+                    "<td>" + t.OwnerType + "</td>" +
+                    "<td>" + t.OwnerID + "</td>" +
+                    "<td>" + t.Period + "</td>" +
+                    "<td>" + new Date(t.LastTimestamp).toLocaleString() + "</td>" +
+                    "<td><button class=\"btn-small danger\" onclick=\"deleteTask(" + t.ID + ")\">Delete</button></td>" +
+                "</tr>";
+            }).join('');
         }
 
         async function createTask(e) {
@@ -162,7 +163,7 @@ const indexHTML = `<!DOCTYPE html>
 
         async function deleteTask(id) {
             if (!confirm('Delete this task?')) return;
-            await fetch(`/api/tasks/${id}`, {method: 'DELETE'});
+            await fetch('/api/tasks/' + id, {method: 'DELETE'});
             loadTasks();
         }
 
@@ -170,16 +171,16 @@ const indexHTML = `<!DOCTYPE html>
             const res = await fetch('/api/accounts');
             const accounts = await res.json();
             const tbody = document.querySelector('#accountsTable tbody');
-            tbody.innerHTML = accounts.map(a => `
-                <tr>
-                    <td>${a.ID}</td>
-                    <td>${a.Login}</td>
-                    <td>${a.Proxy || '-'}</td>
-                    <td>${a.GroupID}</td>
-                    <td><span class="status ${a.IsBlocked ? 'blocked' : 'active'}">${a.IsBlocked ? 'Blocked' : 'Active'}</span></td>
-                    <td><button class="btn-small danger" onclick="deleteAccount(${a.ID})">Delete</button></td>
-                </tr>
-            `).join('');
+            tbody.innerHTML = accounts.map(function(a){
+                return "<tr>" +
+                    "<td>" + a.ID + "</td>" +
+                    "<td>" + a.Login + "</td>" +
+                    "<td>" + (a.Proxy || '-') + "</td>" +
+                    "<td>" + a.GroupID + "</td>" +
+                    "<td><span class=\"status " + (a.IsBlocked ? "blocked" : "active") + "\">" + (a.IsBlocked ? "Blocked" : "Active") + "</span></td>" +
+                    "<td><button class=\"btn-small danger\" onclick=\"deleteAccount(" + a.ID + ")\">Delete</button></td>" +
+                "</tr>";
+            }).join('');
         }
 
         async function createAccount(e) {
@@ -203,7 +204,7 @@ const indexHTML = `<!DOCTYPE html>
 
         async function deleteAccount(id) {
             if (!confirm('Delete this account?')) return;
-            await fetch(`/api/accounts/${id}`, {method: 'DELETE'});
+            await fetch('/api/accounts/' + id, {method: 'DELETE'});
             loadAccounts();
         }
 
