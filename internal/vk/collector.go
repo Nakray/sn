@@ -78,6 +78,19 @@ func (col *Collector) CollectUser(userID int64) error {
 		}
 	}
 
+		// Collect likes for posts
+	for _, postID := range postIDs {
+		likes, err := col.client.GetLikes(userID, postID, "post", 1000)
+		if err != nil {
+			log.Printf("Failed to get likes for post %d: %v\n", postID, err)
+		} else {
+			likeDetails := map[string]interface{}{"post_id": postID}
+			if err := col.db.WriteRelations("vkontakte", owner, database.RelationTypeLike, likeDetails, likes); err != nil {
+				log.Printf("Failed to save likes for post %d: %v\n", postID, err)
+			}
+		}
+	}
+
 	// Get followers
 	followers, err := col.client.GetFollowers(userID, 1000)
 	if err != nil {
@@ -104,7 +117,20 @@ func (col *Collector) CollectUser(userID int64) error {
 		}
 		if len(photoIDs) > 0 {
 			col.db.WriteRelations("vkontakte", owner, database.RelationTypePhoto, nil, photoIDs)
+		
+		
+			// Collect likes for photos
+	for _, photoID := range photoIDs {
+		likes, err := col.client.GetLikes(userID, photoID, "photo", 1000)
+		if err != nil {
+			log.Printf("Failed to get likes for photo %d: %v\n", photoID, err)
+		} else {
+			likeDetails := map[string]interface{}{"photo_id": photoID}
+			if err := col.db.WriteRelations("vkontakte", owner, database.RelationTypeLike, likeDetails, likes); err != nil {
+				log.Printf("Failed to save likes for photo %d: %v\n", photoID, err)
+			}
 		}
+	}}
 	}
 
 	return nil
