@@ -5,6 +5,9 @@ import (
 	"log"
 	"sync"
 	"time"
+	"context"
+
+	"github.com/redis/go-redis/v9"
 
 	"github.com/Nakray/sn/internal/config"
 	"github.com/Nakray/sn/internal/database"
@@ -18,6 +21,7 @@ type Service struct {
 	wg      sync.WaitGroup
 	running bool
 	mu      sync.Mutex
+	redis  *redis.Client
 }
 
 func NewService(db *database.DB, cfg *config.Config) *Service {
@@ -136,4 +140,49 @@ func (s *Service) processTask(task database.MonitoringTask) error {
 
 	// Collect entity
 	return collector.CollectEntity(task.OwnerType, task.OwnerID)
+}
+
+// isTaskEnabled проверяет разрешен ли запуск задачи через Redis
+func (s *Service) isTaskEnabled(taskID int64) bool {
+	key := fmt.Sprintf("monitoring:task:%d:enabled", taskID)
+	val, err := s.redis.Get(context.Background(), key).Result()
+	if err == redis.Nil {
+		return true // По умолчанию включено
+	}
+	return val == "true"
+}
+
+// isTaskInCooldown проверяет находится ли задача в cooldown
+func (s *Service) isTaskInCooldown(taskID int64) bool {
+	key := fmt.Sprintf("monitoring:task:%d:cooldown", taskID)
+	exists, _ := s.redis.Exists(context.Background(), key).Result()
+	return exists > 0
+}
+
+// DisableTask выключает задачу
+func (s *Service) DisableTask(taskID int64) error {
+	key := fmt.Sprintf("monitoring:task:%d:enabled", taskID)
+	return s.redis.Set(context.Background(), key, "false", 0).Err()
+}
+
+// EnableTask включает задачу
+func (s *Service) EnableTask(taskID int64) error {
+	key := fmt.Sprintf("monitoring:task:%d:enabled", taskID)
+	return s.redis.Set(context.Background(), key, "true", 0).Err()
+}
+
+// SetTaskCooldown устанавливает cooldown для задачи
+func (s *Service) SetTaskCooldown(taskID int64, duration time.Duration) error {
+	key := fmt.Sprintf("monitoring:task:%d:cooldown", taskID)
+	return s.redis.Set(context.Background(), key, "1", duration).Err()
+}
+
+// TriggerTaskNow запускает задачу немедленно
+func (s *Service) TriggerTaskNow(taskID int64) error {
+	// Убираем cooldown
+	key := fmt.Sprintf("monitoring:task:%d:cooldown", taskID)
+	s.redis.Del(context.Background(), key)
+	
+	// Сбрасываем LastTimestamp
+	return s.db.TriggerTaskNow(taskID)
 }
