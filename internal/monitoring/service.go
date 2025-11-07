@@ -24,11 +24,12 @@ type Service struct {
 	redis  *redis.Client
 }
 
-func NewService(db *database.DB, cfg *config.Config) *Service {
+rdb *redis.Client, ervice {
 	return &Service{
 		db:     db,
 		config: cfg,
 		stopCh: make(chan struct{}),
+		redis:  rdb,
 	}
 }
 
@@ -70,48 +71,57 @@ func (s *Service) worker(workerID int) {
 	log.Printf("Monitoring worker %d started\n", workerID)
 
 	// Run immediately on start
-	s.processTasks(workerID)
-
+	s.processNextTask(workerID)
 	for {
 		select {
 		case <-s.stopCh:
 			log.Printf("Monitoring worker %d stopped\n", workerID)
 			return
 		case <-ticker.C:
-			s.processTasks(workerID)
-		}
+			s.processNextTask(workerID)		}
 	}
 }
 
-func (s *Service) processTasks(workerID int) {
-	tasks, err := s.db.GetDueMonitoringTasks()
+func (s *Service) processNextTask(workerID int) {
+	// Get next monitoring task with advisory lock
+	task, err := s.db.GetNextMonitoringTask()
 	if err != nil {
-		log.Printf("Worker %d: failed to get due tasks: %v\n", workerID, err)
+		log.Printf("Worker %d: failed to get next task: %v", workerID, err)
 		return
 	}
 
-	if len(tasks) == 0 {
+	// No tasks available
+	if task == nil {
 		return
 	}
 
-	log.Printf("Worker %d: processing %d tasks\n", workerID, len(tasks))
+	// Release advisory lock when done
+	defer s.db.ReleaseTaskLock(task.ID)
 
-	for _, task := range tasks {
-		success := true
-		if err := s.processTask(task); err != nil {
-			log.Printf("Worker %d: task %d failed: %v\n", workerID, task.ID, err)
-			success = false
-		} else {
-			log.Printf("Worker %d: task %d completed successfully\n", workerID, task.ID)
-		}
+	// Check if task is enabled in Redis
+	if !s.isTaskEnabled(task.ID) {
+		log.Printf("Worker %d: task %d is disabled, skipping", workerID, task.ID)
+		return
+	}
 
-		// Update task timestamp and handle unlock logic
-		if err := s.db.UpdateTaskLastTimestamp(&task, success); err != nil {
-			log.Printf("Worker %d: failed to update task %d timestamp: %v\n", workerID, task.ID, err)
-		}
+	// Check if task is in cooldown period
+	if s.isTaskInCooldown(task.ID) {
+		log.Printf("Worker %d: task %d is in cooldown, skipping", workerID, task.ID)
+		return
+	}
+
+	// Process the task
+	success := true
+	if err := s.processTask(*task); err != nil {
+		success = false
+		log.Printf("Worker %d: task %d failed: %v", workerID, task.ID, err)
+	}
+
+	// Update task timestamp
+	if err := s.db.UpdateTaskLastTimestamp(task, success); err != nil {
+		log.Printf("Worker %d: failed to update task %d timestamp: %v", workerID, task.ID, err)
 	}
 }
-
 func (s *Service) processTask(task database.MonitoringTask) error {
 	// Get available account
 	account, err := s.db.GetAvailableAccount(task.SocialNetworkType, task.AccountGroupID)
