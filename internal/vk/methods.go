@@ -126,3 +126,27 @@ func (c *Client) GetGroupMembers(groupID int64, count int) ([]int64, error) {
 
 	return result.Items, nil
 }
+
+func (c *Client) GetLikes(ownerID int64, itemID int64, itemType string, count int) ([]int64, error) {
+	params := map[string]string{
+		"owner_id": strconv.FormatInt(ownerID, 10),
+		"item_id":  strconv.FormatInt(itemID, 10),
+		"type":     itemType,
+		"count":    strconv.Itoa(count),
+	}
+
+	resp, err := c.Call("likes.getList", params)
+	if err != nil {
+		return nil, err
+	}
+
+	var result struct {
+		Items []int64 `json:"items"`
+	}
+
+	if err := json.Unmarshal(resp, &result); err != nil {
+		return nil, err
+	}
+
+	return result.Items, nil
+}

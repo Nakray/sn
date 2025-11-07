@@ -93,14 +93,16 @@ func (s *Service) processTasks(workerID int) {
 	log.Printf("Worker %d: processing %d tasks\n", workerID, len(tasks))
 
 	for _, task := range tasks {
+		success := true
 		if err := s.processTask(task); err != nil {
 			log.Printf("Worker %d: task %d failed: %v\n", workerID, task.ID, err)
+			success = false
 		} else {
 			log.Printf("Worker %d: task %d completed successfully\n", workerID, task.ID)
 		}
 
-		// Update task timestamp
-		if err := s.db.UpdateTaskLastTimestamp(task.ID); err != nil {
+		// Update task timestamp and handle unlock logic
+		if err := s.db.UpdateTaskLastTimestamp(&task, success); err != nil {
 			log.Printf("Worker %d: failed to update task %d timestamp: %v\n", workerID, task.ID, err)
 		}
 	}
